@@ -35,9 +35,14 @@ const server = http.createServer(async (req, res) => {
     // Get Slack channels using the bot token
     try {
       const axios = require('axios');
-      // Temporarily hardcode for testing
+      // Hardcoded token for testing - should always work
       const tokenParts = ['xoxb-5847669636770', '9414093384181', 'nSsENtbXr9dWvBP0L7StVcKY'];
-      const botToken = process.env.SLACK_BOT_TOKEN || tokenParts.join('-');
+      const hardcodedToken = tokenParts.join('-');
+      const botToken = process.env.SLACK_BOT_TOKEN || hardcodedToken;
+      
+      console.log('Environment token set:', !!process.env.SLACK_BOT_TOKEN);
+      console.log('Using hardcoded fallback:', !process.env.SLACK_BOT_TOKEN);
+      console.log('Final token starts with:', botToken.substring(0, 10));
       
       console.log('Using bot token:', botToken.substring(0, 15) + '...');
       
@@ -126,9 +131,14 @@ const server = http.createServer(async (req, res) => {
     // Test Slack bot token authentication
     try {
       const axios = require('axios');
-      // Temporarily hardcode for testing
+      // Hardcoded token for testing - should always work
       const tokenParts = ['xoxb-5847669636770', '9414093384181', 'nSsENtbXr9dWvBP0L7StVcKY'];
-      const botToken = process.env.SLACK_BOT_TOKEN || tokenParts.join('-');
+      const hardcodedToken = tokenParts.join('-');
+      const botToken = process.env.SLACK_BOT_TOKEN || hardcodedToken;
+      
+      console.log('Environment token set:', !!process.env.SLACK_BOT_TOKEN);
+      console.log('Using hardcoded fallback:', !process.env.SLACK_BOT_TOKEN);
+      console.log('Final token starts with:', botToken.substring(0, 10));
       
       console.log('Testing auth with token:', botToken.substring(0, 15) + '...');
       
