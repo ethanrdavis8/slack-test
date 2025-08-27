@@ -52,14 +52,18 @@ const server = http.createServer(async (req, res) => {
           'Authorization': `Bearer ${botToken}`
         },
         params: {
-          types: 'public_channel,private_channel',
-          limit: 100
+          types: 'public_channel',
+          limit: 100,
+          exclude_archived: false
         }
       });
       
-      console.log('Slack API Response:', response.data);
+      console.log('Full Slack API Response:', JSON.stringify(response.data, null, 2));
       
       if (response.data.ok) {
+        console.log('Raw channels from API:', response.data.channels);
+        console.log('Number of raw channels:', response.data.channels ? response.data.channels.length : 'undefined');
+        
         const channels = response.data.channels.map(channel => ({
           id: channel.id,
           name: channel.name,
@@ -68,7 +72,7 @@ const server = http.createServer(async (req, res) => {
           num_members: channel.num_members
         }));
         
-        console.log(`Found ${channels.length} channels`);
+        console.log(`Processed ${channels.length} channels:`, channels);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(channels));
@@ -87,6 +91,36 @@ const server = http.createServer(async (req, res) => {
         error: 'Failed to fetch Slack channels',
         details: error.message 
       }));
+    }
+  } else if (parsedUrl.pathname === '/api/test-auth' && req.method === 'GET') {
+    // Test Slack bot token authentication
+    try {
+      const axios = require('axios');
+      const botToken = process.env.SLACK_BOT_TOKEN;
+      
+      if (!botToken) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'No bot token configured' }));
+        return;
+      }
+      
+      console.log('Testing auth with token:', botToken.substring(0, 15) + '...');
+      
+      const response = await axios.get('https://slack.com/api/auth.test', {
+        headers: {
+          'Authorization': `Bearer ${botToken}`
+        }
+      });
+      
+      console.log('Auth test response:', response.data);
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(response.data));
+      
+    } catch (error) {
+      console.error('Auth test error:', error.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message }));
     }
   } else if (parsedUrl.pathname === '/health' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
