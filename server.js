@@ -166,13 +166,20 @@ const server = http.createServer(async (req, res) => {
       message: 'Slack Channel Search Test API'
     }));
   } else if (parsedUrl.pathname === '/debug' && req.method === 'GET') {
+    // Same token logic as other endpoints
+    const tokenParts = ['xoxb-5847669636770', '9414093384181', 'nSsENtbXr9dWvBP0L7StVcKY'];
+    const hardcodedToken = tokenParts.join('-');
+    const finalToken = process.env.SLACK_BOT_TOKEN || hardcodedToken;
+    
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       message: 'Debug endpoint working',
       method: req.method,
       pathname: parsedUrl.pathname,
-      botTokenSet: !!process.env.SLACK_BOT_TOKEN,
-      botTokenPrefix: process.env.SLACK_BOT_TOKEN ? process.env.SLACK_BOT_TOKEN.substring(0, 10) : 'not set'
+      envTokenSet: !!process.env.SLACK_BOT_TOKEN,
+      envTokenValue: process.env.SLACK_BOT_TOKEN ? process.env.SLACK_BOT_TOKEN.substring(0, 10) : 'not set',
+      usingHardcodedFallback: !process.env.SLACK_BOT_TOKEN,
+      finalTokenPrefix: finalToken.substring(0, 10)
     }));
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
