@@ -5,6 +5,11 @@ const path = require('path');
 
 const port = process.env.PORT || 3000;
 
+// Simple cache to avoid rate limits
+let cachedData = null;
+let cacheExpiry = 0;
+const CACHE_DURATION = 60000; // 1 minute cache
+
 const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   
@@ -47,6 +52,17 @@ const server = http.createServer(async (req, res) => {
       console.log('Using bot token:', botToken.substring(0, 15) + '...');
       
       console.log('Fetching Slack channels and users...');
+      
+      // Check cache first
+      const now = Date.now();
+      if (cachedData && now < cacheExpiry) {
+        console.log('Returning cached data to avoid rate limits');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(cachedData));
+        return;
+      }
+      
+      console.log('Cache expired or empty, fetching fresh data...');
       
       // Fetch channels and conversations
       const channelsResponse = await axios.get('https://slack.com/api/conversations.list', {
@@ -105,6 +121,11 @@ const server = http.createServer(async (req, res) => {
         
         console.log(`Processed ${channels.length} channels and ${users.length} users`);
         console.log('Sample results:', allOptions.slice(0, 5));
+        
+        // Cache the results
+        cachedData = allOptions;
+        cacheExpiry = Date.now() + CACHE_DURATION;
+        console.log(`Data cached until: ${new Date(cacheExpiry).toLocaleTimeString()}`);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(allOptions));
