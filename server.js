@@ -64,17 +64,43 @@ const server = http.createServer(async (req, res) => {
       
       console.log('Cache expired or empty, fetching fresh data...');
       
-      // Fetch channels and conversations
-      const channelsResponse = await axios.get('https://slack.com/api/conversations.list', {
-        headers: {
-          'Authorization': `Bearer ${botToken}`
-        },
-        params: {
+      // Fetch ALL channels with pagination
+      let allChannels = [];
+      let cursor = '';
+      let hasMore = true;
+      
+      console.log('Fetching all channels with pagination...');
+      
+      while (hasMore) {
+        const params = {
           types: 'public_channel,private_channel,im,mpim',
-          limit: 100,
+          limit: 200, // Max allowed by Slack
           exclude_archived: true
+        };
+        
+        if (cursor) {
+          params.cursor = cursor;
         }
-      });
+        
+        const channelsResponse = await axios.get('https://slack.com/api/conversations.list', {
+          headers: {
+            'Authorization': `Bearer ${botToken}`
+          },
+          params: params
+        });
+        
+        if (channelsResponse.data.ok) {
+          allChannels = [...allChannels, ...(channelsResponse.data.channels || [])];
+          cursor = channelsResponse.data.response_metadata?.next_cursor || '';
+          hasMore = !!cursor;
+          console.log(`Fetched ${channelsResponse.data.channels.length} channels, total so far: ${allChannels.length}`);
+        } else {
+          hasMore = false;
+          console.error('Error fetching channels:', channelsResponse.data.error);
+        }
+      }
+      
+      console.log(`Total channels fetched: ${allChannels.length}`);
       
       // Fetch users
       const usersResponse = await axios.get('https://slack.com/api/users.list', {
@@ -83,15 +109,27 @@ const server = http.createServer(async (req, res) => {
         }
       });
       
-      console.log('Channels API Response:', JSON.stringify(channelsResponse.data, null, 2));
       console.log('Users API Response:', JSON.stringify(usersResponse.data, null, 2));
       
-      if (channelsResponse.data.ok && usersResponse.data.ok) {
-        const rawChannels = channelsResponse.data.channels || [];
+      if (allChannels.length > 0 && usersResponse.data.ok) {
+        const rawChannels = allChannels;
         const rawUsers = usersResponse.data.members || [];
         
         console.log('Raw channels from API:', rawChannels.length);
         console.log('Raw users from API:', rawUsers.length);
+        
+        // Debug private channels specifically
+        const privateChannels = rawChannels.filter(c => c.is_private && !c.is_im && !c.is_mpim);
+        const publicChannels = rawChannels.filter(c => !c.is_private && !c.is_im && !c.is_mpim);
+        const dms = rawChannels.filter(c => c.is_im);
+        const groupDms = rawChannels.filter(c => c.is_mpim);
+        
+        console.log(`Channel breakdown:`);
+        console.log(`  - Public channels: ${publicChannels.length}`);
+        console.log(`  - Private channels: ${privateChannels.length}`);
+        console.log(`  - Direct messages: ${dms.length}`);
+        console.log(`  - Group DMs: ${groupDms.length}`);
+        console.log('Private channel names:', privateChannels.map(c => c.name));
         
         // Process channels
         const channels = rawChannels.map(channel => ({
@@ -130,8 +168,8 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(allOptions));
       } else {
-        const channelsError = channelsResponse.data.error || 'Unknown error';
-        const usersError = usersResponse.data.error || 'Unknown error';
+        const channelsError = allChannels.length === 0 ? 'Failed to fetch channels' : 'OK';
+        const usersError = usersResponse.data?.error || 'Unknown error';
         console.error('Slack API Error - Channels:', channelsError);
         console.error('Slack API Error - Users:', usersError);
         res.writeHead(500, { 'Content-Type': 'application/json' });
