@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slack Channel Search Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .slack-logo {
+            width: 32px;
+            height: 32px;
+            fill: currentColor;
+        }
+        
+        .content {
+            padding: 2rem;
+        }
+        
+        .search-section {
+            margin-bottom: 2rem;
+        }
+        
+        .search-section h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+        
+        .results-section {
+            min-height: 200px;
+        }
+        
+        .results-section h3 {
+            margin-bottom: 1rem;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .channel-list {
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #fafafa;
+        }
+        
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #e1e5e9;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        
+        .channel-item:hover {
+            background-color: #f0f8ff;
+        }
+        
+        .channel-item:last-child {
+            border-bottom: none;
+        }
+        
+        .channel-item.selected {
+            background-color: #e8f5e8;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .channel-icon {
+            margin-right: 0.75rem;
+            font-size: 1.2rem;
+        }
+        
+        .channel-info {
+            flex: 1;
+        }
+        
+        .channel-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+        
+        .channel-details {
+            font-size: 0.875rem;
+            color: #666;
+        }
+        
+        .channel-id {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 0.125rem 0.25rem;
+            border-radius: 3px;
+            margin-right: 0.5rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 2rem;
+            color: #d32f2f;
+            background: #ffebee;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: #666;
+        }
+        
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            padding: 1rem 2rem;
+            border-top: 1px solid #e1e5e9;
+            font-size: 0.875rem;
+            color: #666;
+        }
+        
+        .selected-channel {
+            background: #e8f5e8;
+            border: 1px solid #4CAF50;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .selected-channel h4 {
+            color: #2e7d32;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <svg class="slack-logo" viewBox="0 0 24 24">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.527 2.527 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.521-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.523 2.521h-2.521V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.521A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.523v-2.521h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.312A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.523 2.523h-6.312z"/>
+                </svg>
+                Slack Channel Search Test
+            </h1>
+            <p>Test the channel search functionality</p>
+        </div>
+        
+        <div class="content">
+            <div class="search-section">
+                <h2>🔍 Search Slack Channels</h2>
+                <input type="text" 
+                       class="search-input" 
+                       id="channelSearch" 
+                       placeholder="Start typing to search channels..."
+                       autocomplete="off">
+            </div>
+            
+            <div class="results-section">
+                <h3>
+                    📋 Results 
+                    <span id="resultCount"></span>
+                </h3>
+                <div class="channel-list" id="channelList">
+                    <div class="loading">
+                        🔄 Loading channels...
+                    </div>
+                </div>
+            </div>
+            
+            <div id="selectedChannel"></div>
+        </div>
+        
+        <div class="status-bar" id="statusBar">
+            Ready to search
+        </div>
+    </div>
+
+    <script>
+        let allChannels = [];
+        let selectedChannel = null;
+
+        // Load channels when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadChannels();
+            
+            // Set up search input handler
+            const searchInput = document.getElementById('channelSearch');
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value;
+                console.log('Search input:', searchTerm);
+                filterAndDisplayChannels(searchTerm);
+            });
+            
+            // Focus the search input
+            searchInput.focus();
+        });
+
+        async function loadChannels() {
+            const statusBar = document.getElementById('statusBar');
+            const channelList = document.getElementById('channelList');
+            
+            try {
+                statusBar.textContent = 'Loading channels from Slack API...';
+                
+                const response = await fetch('/api/slack-channels');
+                const data = await response.json();
+                
+                if (response.ok && Array.isArray(data)) {
+                    allChannels = data;
+                    console.log(`Loaded ${allChannels.length} channels:`, allChannels);
+                    
+                    statusBar.textContent = `Loaded ${allChannels.length} channels - start typing to search`;
+                    document.getElementById('resultCount').textContent = `(${allChannels.length} total)`;
+                    
+                    // Show all channels initially
+                    filterAndDisplayChannels('');
+                    
+                } else {
+                    throw new Error(data.error || 'Failed to load channels');
+                }
+                
+            } catch (error) {
+                console.error('Error loading channels:', error);
+                statusBar.textContent = 'Error loading channels';
+                channelList.innerHTML = `
+                    <div class="error">
+                        ❌ Failed to load channels: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function filterAndDisplayChannels(searchTerm) {
+            const channelList = document.getElementById('channelList');
+            const resultCount = document.getElementById('resultCount');
+            const statusBar = document.getElementById('statusBar');
+            
+            console.log('Filtering channels with term:', searchTerm);
+            console.log('Total channels available:', allChannels.length);
+            
+            if (!searchTerm.trim()) {
+                // Show all channels when no search term
+                displayChannels(allChannels);
+                resultCount.textContent = `(${allChannels.length} total)`;
+                statusBar.textContent = `Showing all ${allChannels.length} channels`;
+                return;
+            }
+            
+            const filteredChannels = allChannels.filter(channel => 
+                channel.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            
+            console.log(`Found ${filteredChannels.length} matching channels`);
+            
+            displayChannels(filteredChannels);
+            resultCount.textContent = `(${filteredChannels.length} matches)`;
+            statusBar.textContent = filteredChannels.length === 0 
+                ? `No channels match "${searchTerm}"`
+                : `Found ${filteredChannels.length} channels matching "${searchTerm}"`;
+        }
+
+        function displayChannels(channels) {
+            const channelList = document.getElementById('channelList');
+            
+            if (channels.length === 0) {
+                channelList.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        <div>No channels match your search</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            channelList.innerHTML = '';
+            
+            channels.forEach(channel => {
+                const channelItem = document.createElement('div');
+                channelItem.className = 'channel-item';
+                channelItem.onclick = () => selectChannel(channel);
+                
+                const isPrivate = channel.is_private;
+                const isArchived = channel.is_archived;
+                
+                channelItem.innerHTML = `
+                    <div class="channel-icon">
+                        ${isPrivate ? '🔒' : '#'}
+                    </div>
+                    <div class="channel-info">
+                        <div class="channel-name">
+                            ${channel.name}
+                            ${isArchived ? ' (archived)' : ''}
+                        </div>
+                        <div class="channel-details">
+                            <span class="channel-id">${channel.id}</span>
+                            ${channel.num_members ? `${channel.num_members} members` : ''}
+                            ${isPrivate ? ' • Private' : ' • Public'}
+                        </div>
+                    </div>
+                `;
+                
+                channelList.appendChild(channelItem);
+            });
+        }
+
+        function selectChannel(channel) {
+            selectedChannel = channel;
+            
+            // Update visual selection
+            document.querySelectorAll('.channel-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            
+            // Show selected channel details
+            const selectedChannelDiv = document.getElementById('selectedChannel');
+            selectedChannelDiv.innerHTML = `
+                <div class="selected-channel">
+                    <h4>✅ Selected Channel</h4>
+                    <div><strong>Name:</strong> #${channel.name}</div>
+                    <div><strong>ID:</strong> ${channel.id}</div>
+                    <div><strong>Type:</strong> ${channel.is_private ? 'Private' : 'Public'}</div>
+                    ${channel.num_members ? `<div><strong>Members:</strong> ${channel.num_members}</div>` : ''}
+                    ${channel.is_archived ? '<div><strong>Status:</strong> Archived</div>' : ''}
+                </div>
+            `;
+            
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = `Selected: #${channel.name} (${channel.id})`;
+            
+            console.log('Selected channel:', channel);
+        }
+    </script>
+</body>
+</html>
