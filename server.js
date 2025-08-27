@@ -8,6 +8,8 @@ const port = process.env.PORT || 3000;
 const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   
+  console.log(`${req.method} ${parsedUrl.pathname}`);
+  
   // CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -129,9 +131,18 @@ const server = http.createServer(async (req, res) => {
       uptime: process.uptime(),
       message: 'Slack Channel Search Test API'
     }));
+  } else if (parsedUrl.pathname === '/debug' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      message: 'Debug endpoint working',
+      method: req.method,
+      pathname: parsedUrl.pathname,
+      botTokenSet: !!process.env.SLACK_BOT_TOKEN,
+      botTokenPrefix: process.env.SLACK_BOT_TOKEN ? process.env.SLACK_BOT_TOKEN.substring(0, 10) : 'not set'
+    }));
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not found');
+    res.end(`Route not found: ${req.method} ${parsedUrl.pathname}`);
   }
 });
 
