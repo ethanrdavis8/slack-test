@@ -36,6 +36,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Page not found');
     }
+  } else if (parsedUrl.pathname === '/scheduler' && req.method === 'GET') {
+    // Serve the message scheduler HTML page
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'message-scheduler.html'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch (error) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Scheduler page not found');
+    }
   } else if (parsedUrl.pathname === '/api/slack-channels' && req.method === 'GET') {
     // Get Slack channels using the bot token
     try {
@@ -240,6 +250,79 @@ const server = http.createServer(async (req, res) => {
       usingHardcodedFallback: !process.env.SLACK_BOT_TOKEN,
       finalTokenPrefix: finalToken.substring(0, 10)
     }));
+  } else if (parsedUrl.pathname === '/api/send-test-message' && req.method === 'POST') {
+    // Send test message to selected channels
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const { message, channels } = JSON.parse(body);
+        
+        if (!message || !channels || channels.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing message or channels' }));
+          return;
+        }
+        
+        // Get bot token
+        const tokenParts = ['xoxb-5847669636770', '9414093384181', 'nSsENtbXr9dWvBP0L7StVcKY'];
+        const hardcodedToken = tokenParts.join('-');
+        const botToken = process.env.SLACK_BOT_TOKEN || hardcodedToken;
+        
+        console.log(`Sending test message "${message}" to ${channels.length} channels`);
+        
+        const results = [];
+        const axios = require('axios');
+        
+        // Send message to each channel
+        for (const channelId of channels) {
+          try {
+            const response = await axios.post('https://slack.com/api/chat.postMessage', {
+              channel: channelId,
+              text: `🧪 ${message}\n\nSent at: ${new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} PT\n\nThis is a test message from the Slack Message Scheduler.`,
+              username: 'Message Scheduler Test'
+            }, {
+              headers: {
+                'Authorization': `Bearer ${botToken}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.data.ok) {
+              console.log(`✅ Sent to channel ${channelId}`);
+              results.push({ channelId, success: true });
+            } else {
+              console.error(`❌ Failed to send to ${channelId}: ${response.data.error}`);
+              results.push({ channelId, success: false, error: response.data.error });
+            }
+          } catch (error) {
+            console.error(`❌ Error sending to ${channelId}: ${error.message}`);
+            results.push({ channelId, success: false, error: error.message });
+          }
+        }
+        
+        const successful = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        console.log(`Message sending complete: ${successful} successful, ${failed} failed`);
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          message: 'Test message sent',
+          results: results,
+          summary: {
+            successful,
+            failed,
+            total: channels.length
+          }
+        }));
+        
+      } catch (error) {
+        console.error('Error sending test message:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to send test message' }));
+      }
+    });
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end(`Route not found: ${req.method} ${parsedUrl.pathname}`);

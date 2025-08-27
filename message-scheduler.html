@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slack Message Scheduler Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .slack-logo {
+            width: 32px;
+            height: 32px;
+            fill: #4A154B;
+        }
+        
+        .messages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .message-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .message-card.disabled {
+            opacity: 0.7;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .message-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #333;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #4CAF50;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+        
+        .schedule-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .schedule-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .schedule-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .schedule-select {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .channels-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .channels-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        
+        .channels-count {
+            background: #f0f0f0;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .channels-list {
+            background: #f8f9fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 0.75rem;
+        }
+        
+        .channels-list:empty::after {
+            content: "No channels selected";
+            display: block;
+            padding: 1rem;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+        
+        .channel-tag {
+            display: inline-flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 0.25rem 0.5rem;
+            margin: 0.25rem;
+            font-size: 0.875rem;
+        }
+        
+        .channel-tag-icon {
+            margin-right: 0.25rem;
+        }
+        
+        .channel-tag-remove {
+            margin-left: 0.5rem;
+            cursor: pointer;
+            color: #999;
+            font-weight: bold;
+        }
+        
+        .channel-tag-remove:hover {
+            color: #e53e3e;
+        }
+        
+        .channel-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+        
+        .btn-test {
+            background: #3182ce;
+            color: white;
+            width: 100%;
+        }
+        
+        .btn-test:hover {
+            background: #2c5aa0;
+        }
+        
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c53030;
+        }
+        
+        .status-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #f0f0f0;
+            font-size: 0.75rem;
+            color: #999;
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .channel-list {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        
+        .channel-item:hover {
+            background-color: #f7fafc;
+        }
+        
+        .channel-item.selected {
+            background-color: #e8f5e8;
+        }
+        
+        .channel-checkbox {
+            margin-right: 0.75rem;
+        }
+        
+        .channel-info {
+            flex: 1;
+        }
+        
+        .channel-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .channel-type {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            justify-content: flex-end;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            z-index: 2000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background-color: #f0fff4;
+            color: #276749;
+            border: 1px solid #9ae6b4;
+        }
+        
+        .notification.error {
+            background-color: #fff5f5;
+            color: #742a2a;
+            border: 1px solid #fed7d7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <svg class="slack-logo" viewBox="0 0 24 24">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.527 2.527 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.521-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.523 2.521h-2.521V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.521A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.523v-2.521h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.312A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.523 2.523h-6.312z"/>
+                </svg>
+                Slack Message Scheduler Test
+            </h1>
+            <p>Schedule test messages to Slack channels</p>
+        </div>
+        
+        <div class="messages-grid">
+            <!-- Message A -->
+            <div class="message-card" id="message-a">
+                <div class="message-header">
+                    <span class="message-title">📝 Test - A</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-a" onchange="toggleMessage('a')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="schedule-section">
+                    <div class="schedule-label">Schedule (PT)</div>
+                    <div class="schedule-controls">
+                        <select class="schedule-select" id="day-a" onchange="updateSchedule('a')">
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                        </select>
+                        <select class="schedule-select" id="time-a" onchange="updateSchedule('a')">
+                            <option value="0">12:00 AM</option>
+                            <option value="1">1:00 AM</option>
+                            <option value="2">2:00 AM</option>
+                            <option value="3">3:00 AM</option>
+                            <option value="4">4:00 AM</option>
+                            <option value="5">5:00 AM</option>
+                            <option value="6">6:00 AM</option>
+                            <option value="7">7:00 AM</option>
+                            <option value="8">8:00 AM</option>
+                            <option value="9">9:00 AM</option>
+                            <option value="10">10:00 AM</option>
+                            <option value="11">11:00 AM</option>
+                            <option value="12">12:00 PM</option>
+                            <option value="13">1:00 PM</option>
+                            <option value="14">2:00 PM</option>
+                            <option value="15">3:00 PM</option>
+                            <option value="16">4:00 PM</option>
+                            <option value="17">5:00 PM</option>
+                            <option value="18">6:00 PM</option>
+                            <option value="19">7:00 PM</option>
+                            <option value="20">8:00 PM</option>
+                            <option value="21">9:00 PM</option>
+                            <option value="22">10:00 PM</option>
+                            <option value="23">11:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="channels-section">
+                    <div class="channels-header">
+                        <div class="schedule-label">Channels</div>
+                        <div class="channels-count" id="count-a">0 selected</div>
+                    </div>
+                    <div class="channels-list" id="channels-a"></div>
+                    <div class="channel-buttons">
+                        <button class="btn btn-primary" onclick="openChannelModal('a')">Add Channels</button>
+                        <button class="btn btn-danger" onclick="clearChannels('a')">Clear All</button>
+                    </div>
+                </div>
+                
+                <button class="btn btn-test" onclick="sendTest('a')">🚀 Send Test Now</button>
+                
+                <div class="status-section" id="status-a">
+                    Never sent
+                </div>
+            </div>
+            
+            <!-- Message B -->
+            <div class="message-card" id="message-b">
+                <div class="message-header">
+                    <span class="message-title">📊 Test - B</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-b" onchange="toggleMessage('b')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="schedule-section">
+                    <div class="schedule-label">Schedule (PT)</div>
+                    <div class="schedule-controls">
+                        <select class="schedule-select" id="day-b" onchange="updateSchedule('b')">
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                        </select>
+                        <select class="schedule-select" id="time-b" onchange="updateSchedule('b')">
+                            <option value="0">12:00 AM</option>
+                            <option value="1">1:00 AM</option>
+                            <option value="2">2:00 AM</option>
+                            <option value="3">3:00 AM</option>
+                            <option value="4">4:00 AM</option>
+                            <option value="5">5:00 AM</option>
+                            <option value="6">6:00 AM</option>
+                            <option value="7">7:00 AM</option>
+                            <option value="8">8:00 AM</option>
+                            <option value="9">9:00 AM</option>
+                            <option value="10">10:00 AM</option>
+                            <option value="11">11:00 AM</option>
+                            <option value="12">12:00 PM</option>
+                            <option value="13">1:00 PM</option>
+                            <option value="14">2:00 PM</option>
+                            <option value="15">3:00 PM</option>
+                            <option value="16">4:00 PM</option>
+                            <option value="17">5:00 PM</option>
+                            <option value="18">6:00 PM</option>
+                            <option value="19">7:00 PM</option>
+                            <option value="20">8:00 PM</option>
+                            <option value="21">9:00 PM</option>
+                            <option value="22">10:00 PM</option>
+                            <option value="23">11:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="channels-section">
+                    <div class="channels-header">
+                        <div class="schedule-label">Channels</div>
+                        <div class="channels-count" id="count-b">0 selected</div>
+                    </div>
+                    <div class="channels-list" id="channels-b"></div>
+                    <div class="channel-buttons">
+                        <button class="btn btn-primary" onclick="openChannelModal('b')">Add Channels</button>
+                        <button class="btn btn-danger" onclick="clearChannels('b')">Clear All</button>
+                    </div>
+                </div>
+                
+                <button class="btn btn-test" onclick="sendTest('b')">🚀 Send Test Now</button>
+                
+                <div class="status-section" id="status-b">
+                    Never sent
+                </div>
+            </div>
+            
+            <!-- Message C -->
+            <div class="message-card" id="message-c">
+                <div class="message-header">
+                    <span class="message-title">🎯 Test - C</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-c" onchange="toggleMessage('c')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="schedule-section">
+                    <div class="schedule-label">Schedule (PT)</div>
+                    <div class="schedule-controls">
+                        <select class="schedule-select" id="day-c" onchange="updateSchedule('c')">
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                        </select>
+                        <select class="schedule-select" id="time-c" onchange="updateSchedule('c')">
+                            <option value="0">12:00 AM</option>
+                            <option value="1">1:00 AM</option>
+                            <option value="2">2:00 AM</option>
+                            <option value="3">3:00 AM</option>
+                            <option value="4">4:00 AM</option>
+                            <option value="5">5:00 AM</option>
+                            <option value="6">6:00 AM</option>
+                            <option value="7">7:00 AM</option>
+                            <option value="8">8:00 AM</option>
+                            <option value="9">9:00 AM</option>
+                            <option value="10">10:00 AM</option>
+                            <option value="11">11:00 AM</option>
+                            <option value="12">12:00 PM</option>
+                            <option value="13">1:00 PM</option>
+                            <option value="14">2:00 PM</option>
+                            <option value="15">3:00 PM</option>
+                            <option value="16">4:00 PM</option>
+                            <option value="17">5:00 PM</option>
+                            <option value="18">6:00 PM</option>
+                            <option value="19">7:00 PM</option>
+                            <option value="20">8:00 PM</option>
+                            <option value="21">9:00 PM</option>
+                            <option value="22">10:00 PM</option>
+                            <option value="23">11:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="channels-section">
+                    <div class="channels-header">
+                        <div class="schedule-label">Channels</div>
+                        <div class="channels-count" id="count-c">0 selected</div>
+                    </div>
+                    <div class="channels-list" id="channels-c"></div>
+                    <div class="channel-buttons">
+                        <button class="btn btn-primary" onclick="openChannelModal('c')">Add Channels</button>
+                        <button class="btn btn-danger" onclick="clearChannels('c')">Clear All</button>
+                    </div>
+                </div>
+                
+                <button class="btn btn-test" onclick="sendTest('c')">🚀 Send Test Now</button>
+                
+                <div class="status-section" id="status-c">
+                    Never sent
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Channel Selection Modal -->
+    <div class="modal-overlay" id="channelModal">
+        <div class="modal">
+            <h3>Select Channels</h3>
+            <input type="text" class="search-input" id="channelSearch" placeholder="Search channels and users...">
+            <div class="channel-list" id="channelList">
+                <!-- Channels will be populated here -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeChannelModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveChannels()">Save Selection</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration storage
+        let messageConfigs = {
+            a: {
+                enabled: false,
+                day: 1,
+                time: 9,
+                channels: [],
+                lastSent: null
+            },
+            b: {
+                enabled: false,
+                day: 1,
+                time: 9,
+                channels: [],
+                lastSent: null
+            },
+            c: {
+                enabled: false,
+                day: 1,
+                time: 9,
+                channels: [],
+                lastSent: null
+            }
+        };
+        
+        let allChannels = [];
+        let currentMessage = null;
+        let tempSelectedChannels = [];
+        
+        // Load saved configuration
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfiguration();
+            loadChannels();
+            renderAllMessages();
+            
+            // Set up search handler
+            document.getElementById('channelSearch').addEventListener('input', function(e) {
+                filterChannels(e.target.value);
+            });
+        });
+        
+        function loadConfiguration() {
+            const saved = localStorage.getItem('messageSchedulerConfig');
+            if (saved) {
+                messageConfigs = JSON.parse(saved);
+                // Apply saved settings to UI
+                Object.keys(messageConfigs).forEach(msgId => {
+                    const config = messageConfigs[msgId];
+                    document.getElementById(`toggle-${msgId}`).checked = config.enabled;
+                    document.getElementById(`day-${msgId}`).value = config.day;
+                    document.getElementById(`time-${msgId}`).value = config.time;
+                    updateMessageCard(msgId);
+                });
+            }
+        }
+        
+        function saveConfiguration() {
+            localStorage.setItem('messageSchedulerConfig', JSON.stringify(messageConfigs));
+        }
+        
+        async function loadChannels() {
+            try {
+                const response = await fetch('/api/slack-channels');
+                if (response.ok) {
+                    allChannels = await response.json();
+                    console.log(`Loaded ${allChannels.length} channels`);
+                } else {
+                    console.error('Failed to load channels');
+                    showNotification('Failed to load channels', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading channels:', error);
+                showNotification('Error loading channels', 'error');
+            }
+        }
+        
+        function renderAllMessages() {
+            ['a', 'b', 'c'].forEach(msgId => {
+                renderChannels(msgId);
+                updateMessageCard(msgId);
+            });
+        }
+        
+        function toggleMessage(msgId) {
+            const enabled = document.getElementById(`toggle-${msgId}`).checked;
+            messageConfigs[msgId].enabled = enabled;
+            updateMessageCard(msgId);
+            saveConfiguration();
+            
+            if (enabled) {
+                showNotification(`Test - ${msgId.toUpperCase()} enabled`, 'success');
+            } else {
+                showNotification(`Test - ${msgId.toUpperCase()} disabled`, 'success');
+            }
+        }
+        
+        function updateSchedule(msgId) {
+            messageConfigs[msgId].day = parseInt(document.getElementById(`day-${msgId}`).value);
+            messageConfigs[msgId].time = parseInt(document.getElementById(`time-${msgId}`).value);
+            saveConfiguration();
+        }
+        
+        function updateMessageCard(msgId) {
+            const card = document.getElementById(`message-${msgId}`);
+            const config = messageConfigs[msgId];
+            
+            if (config.enabled) {
+                card.classList.remove('disabled');
+            } else {
+                card.classList.add('disabled');
+            }
+            
+            // Update status
+            const status = document.getElementById(`status-${msgId}`);
+            if (config.lastSent) {
+                const date = new Date(config.lastSent);
+                status.textContent = `Last sent: ${date.toLocaleString()}`;
+            } else {
+                status.textContent = 'Never sent';
+            }
+        }
+        
+        function renderChannels(msgId) {
+            const config = messageConfigs[msgId];
+            const container = document.getElementById(`channels-${msgId}`);
+            const count = document.getElementById(`count-${msgId}`);
+            
+            container.innerHTML = '';
+            count.textContent = `${config.channels.length} selected`;
+            
+            config.channels.forEach(channel => {
+                const tag = document.createElement('span');
+                tag.className = 'channel-tag';
+                
+                let icon = '#';
+                if (channel.type === 'user') icon = '👤';
+                else if (channel.type === 'dm') icon = '💬';
+                else if (channel.type === 'group_dm') icon = '👥';
+                else if (channel.is_private) icon = '🔒';
+                
+                tag.innerHTML = `
+                    <span class="channel-tag-icon">${icon}</span>
+                    <span>${channel.name}</span>
+                    <span class="channel-tag-remove" onclick="removeChannel('${msgId}', '${channel.id}')">×</span>
+                `;
+                container.appendChild(tag);
+            });
+        }
+        
+        function removeChannel(msgId, channelId) {
+            const config = messageConfigs[msgId];
+            config.channels = config.channels.filter(c => c.id !== channelId);
+            renderChannels(msgId);
+            saveConfiguration();
+        }
+        
+        function clearChannels(msgId) {
+            if (confirm('Remove all channels from this message?')) {
+                messageConfigs[msgId].channels = [];
+                renderChannels(msgId);
+                saveConfiguration();
+                showNotification('All channels removed', 'success');
+            }
+        }
+        
+        function openChannelModal(msgId) {
+            currentMessage = msgId;
+            tempSelectedChannels = [...messageConfigs[msgId].channels];
+            document.getElementById('channelModal').classList.add('show');
+            document.getElementById('channelSearch').value = '';
+            document.getElementById('channelSearch').focus();
+            renderChannelList();
+        }
+        
+        function closeChannelModal() {
+            document.getElementById('channelModal').classList.remove('show');
+            currentMessage = null;
+            tempSelectedChannels = [];
+        }
+        
+        function renderChannelList() {
+            const container = document.getElementById('channelList');
+            container.innerHTML = '';
+            
+            allChannels.forEach(channel => {
+                const item = document.createElement('div');
+                item.className = 'channel-item';
+                
+                const isSelected = tempSelectedChannels.some(c => c.id === channel.id);
+                if (isSelected) {
+                    item.classList.add('selected');
+                }
+                
+                let icon = '#';
+                let typeLabel = 'Public Channel';
+                
+                if (channel.type === 'user') {
+                    icon = '👤';
+                    typeLabel = 'User';
+                } else if (channel.type === 'dm') {
+                    icon = '💬';
+                    typeLabel = 'Direct Message';
+                } else if (channel.type === 'group_dm') {
+                    icon = '👥';
+                    typeLabel = 'Group DM';
+                } else if (channel.is_private) {
+                    icon = '🔒';
+                    typeLabel = 'Private Channel';
+                }
+                
+                item.innerHTML = `
+                    <input type="checkbox" class="channel-checkbox" 
+                           ${isSelected ? 'checked' : ''} 
+                           onchange="toggleChannel('${channel.id}')">
+                    <div class="channel-info">
+                        <div class="channel-name">${icon} ${channel.name}</div>
+                        <div class="channel-type">${typeLabel}</div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+        
+        function filterChannels(searchTerm) {
+            const filtered = searchTerm 
+                ? allChannels.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                : allChannels;
+            
+            const container = document.getElementById('channelList');
+            container.innerHTML = '';
+            
+            filtered.forEach(channel => {
+                const item = document.createElement('div');
+                item.className = 'channel-item';
+                
+                const isSelected = tempSelectedChannels.some(c => c.id === channel.id);
+                if (isSelected) {
+                    item.classList.add('selected');
+                }
+                
+                let icon = '#';
+                let typeLabel = 'Public Channel';
+                
+                if (channel.type === 'user') {
+                    icon = '👤';
+                    typeLabel = 'User';
+                } else if (channel.type === 'dm') {
+                    icon = '💬';
+                    typeLabel = 'Direct Message';
+                } else if (channel.type === 'group_dm') {
+                    icon = '👥';
+                    typeLabel = 'Group DM';
+                } else if (channel.is_private) {
+                    icon = '🔒';
+                    typeLabel = 'Private Channel';
+                }
+                
+                item.innerHTML = `
+                    <input type="checkbox" class="channel-checkbox" 
+                           ${isSelected ? 'checked' : ''} 
+                           onchange="toggleChannel('${channel.id}')">
+                    <div class="channel-info">
+                        <div class="channel-name">${icon} ${channel.name}</div>
+                        <div class="channel-type">${typeLabel}</div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+        
+        function toggleChannel(channelId) {
+            const channel = allChannels.find(c => c.id === channelId);
+            const index = tempSelectedChannels.findIndex(c => c.id === channelId);
+            
+            if (index >= 0) {
+                tempSelectedChannels.splice(index, 1);
+            } else {
+                tempSelectedChannels.push(channel);
+            }
+        }
+        
+        function saveChannels() {
+            if (currentMessage) {
+                messageConfigs[currentMessage].channels = tempSelectedChannels;
+                renderChannels(currentMessage);
+                saveConfiguration();
+                showNotification(`Updated channels for Test - ${currentMessage.toUpperCase()}`, 'success');
+            }
+            closeChannelModal();
+        }
+        
+        async function sendTest(msgId) {
+            const config = messageConfigs[msgId];
+            
+            if (config.channels.length === 0) {
+                showNotification('No channels selected!', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/send-test-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Test - ${msgId.toUpperCase()}`,
+                        channels: config.channels.map(c => c.id)
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    messageConfigs[msgId].lastSent = new Date().toISOString();
+                    updateMessageCard(msgId);
+                    saveConfiguration();
+                    showNotification(`Test - ${msgId.toUpperCase()} sent to ${config.channels.length} channels!`, 'success');
+                } else {
+                    throw new Error('Failed to send message');
+                }
+            } catch (error) {
+                console.error('Error sending test:', error);
+                showNotification(`Failed to send Test - ${msgId.toUpperCase()}`, 'error');
+            }
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('channelModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeChannelModal();
+            }
+        });
+    </script>
+</body>
+</html>
