@@ -48,7 +48,7 @@ const server = http.createServer(async (req, res) => {
           'Authorization': `Bearer ${botToken}`
         },
         params: {
-          types: 'public_channel',
+          types: 'public_channel,private_channel',
           limit: 100,
           exclude_archived: false
         }
