@@ -348,20 +348,40 @@
                 
                 const isPrivate = channel.is_private;
                 const isArchived = channel.is_archived;
+                const isUser = channel.type === 'user';
+                const isDM = channel.type === 'dm';
+                const isGroupDM = channel.type === 'group_dm';
+                
+                let icon = '#'; // Default for public channel
+                let typeLabel = 'Public';
+                
+                if (isUser) {
+                    icon = '👤';
+                    typeLabel = 'User';
+                } else if (isDM) {
+                    icon = '💬';
+                    typeLabel = 'Direct Message';
+                } else if (isGroupDM) {
+                    icon = '👥';
+                    typeLabel = 'Group DM';
+                } else if (isPrivate) {
+                    icon = '🔒';
+                    typeLabel = 'Private';
+                }
                 
                 channelItem.innerHTML = `
                     <div class="channel-icon">
-                        ${isPrivate ? '🔒' : '#'}
+                        ${icon}
                     </div>
                     <div class="channel-info">
                         <div class="channel-name">
-                            ${channel.name}
+                            ${isUser ? channel.display_name || channel.name : channel.name}
                             ${isArchived ? ' (archived)' : ''}
                         </div>
                         <div class="channel-details">
                             <span class="channel-id">${channel.id}</span>
                             ${channel.num_members ? `${channel.num_members} members` : ''}
-                            ${isPrivate ? ' • Private' : ' • Public'}
+                            • ${typeLabel}
                         </div>
                     </div>
                 `;

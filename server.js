@@ -41,43 +41,77 @@ const server = http.createServer(async (req, res) => {
       
       console.log('Using bot token:', botToken.substring(0, 15) + '...');
       
-      console.log('Fetching Slack channels...');
+      console.log('Fetching Slack channels and users...');
       
-      const response = await axios.get('https://slack.com/api/conversations.list', {
+      // Fetch channels and conversations
+      const channelsResponse = await axios.get('https://slack.com/api/conversations.list', {
         headers: {
           'Authorization': `Bearer ${botToken}`
         },
         params: {
-          types: 'public_channel,private_channel',
+          types: 'public_channel,private_channel,im,mpim',
           limit: 100,
-          exclude_archived: false
+          exclude_archived: true
         }
       });
       
-      console.log('Full Slack API Response:', JSON.stringify(response.data, null, 2));
+      // Fetch users
+      const usersResponse = await axios.get('https://slack.com/api/users.list', {
+        headers: {
+          'Authorization': `Bearer ${botToken}`
+        }
+      });
       
-      if (response.data.ok) {
-        console.log('Raw channels from API:', response.data.channels);
-        console.log('Number of raw channels:', response.data.channels ? response.data.channels.length : 'undefined');
+      console.log('Channels API Response:', JSON.stringify(channelsResponse.data, null, 2));
+      console.log('Users API Response:', JSON.stringify(usersResponse.data, null, 2));
+      
+      if (channelsResponse.data.ok && usersResponse.data.ok) {
+        const rawChannels = channelsResponse.data.channels || [];
+        const rawUsers = usersResponse.data.members || [];
         
-        const channels = response.data.channels.map(channel => ({
+        console.log('Raw channels from API:', rawChannels.length);
+        console.log('Raw users from API:', rawUsers.length);
+        
+        // Process channels
+        const channels = rawChannels.map(channel => ({
           id: channel.id,
-          name: channel.name,
+          name: channel.name || `Channel ${channel.id}`,
           is_private: channel.is_private,
           is_archived: channel.is_archived,
-          num_members: channel.num_members
+          num_members: channel.num_members,
+          type: channel.is_im ? 'dm' : channel.is_mpim ? 'group_dm' : 'channel'
         }));
         
-        console.log(`Processed ${channels.length} channels:`, channels);
+        // Process users (exclude bots and deleted users)
+        const users = rawUsers
+          .filter(user => !user.deleted && !user.is_bot && user.id !== 'USLACKBOT')
+          .map(user => ({
+            id: user.id,
+            name: user.real_name || user.name,
+            display_name: user.profile?.display_name || user.name,
+            is_private: true,
+            is_archived: false,
+            num_members: 2,
+            type: 'user'
+          }));
+        
+        // Combine channels and users
+        const allOptions = [...channels, ...users];
+        
+        console.log(`Processed ${channels.length} channels and ${users.length} users`);
+        console.log('Sample results:', allOptions.slice(0, 5));
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(channels));
+        res.end(JSON.stringify(allOptions));
       } else {
-        console.error('Slack API Error:', response.data.error);
+        const channelsError = channelsResponse.data.error || 'Unknown error';
+        const usersError = usersResponse.data.error || 'Unknown error';
+        console.error('Slack API Error - Channels:', channelsError);
+        console.error('Slack API Error - Users:', usersError);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
-          error: 'Failed to fetch Slack channels',
-          details: response.data.error 
+          error: 'Failed to fetch Slack data',
+          details: { channels: channelsError, users: usersError }
         }));
       }
     } catch (error) {
